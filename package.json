@@ -1,0 +1,29 @@
+{
+  "name": "benchmarking_utils",
+  "version": "0.1.0",
+  "description": "Utilities for Elasticsearch benchmarking.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cdahlqvist/benchmarking_utils.git"
+  },
+  "keywords": [
+    "elasticsearch",
+    "utilities",
+    "utils",
+    "tool",
+    "benchmark"
+  ],
+  "author": "Christian Dahlqvist",
+  "license": "Apache License Version 2.0",
+  "bugs": {
+    "url": "https://github.com/cdahlqvist/benchmarking_utils/issues"
+  },
+  "homepage": "https://github.com/cdahlqvist/benchmarking_utils",
+  "dependencies": {
+    "elasticsearch": "^4.0.2",
+    "optimist": "~0.6.1"
+  }
+}
