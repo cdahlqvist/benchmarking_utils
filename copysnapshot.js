@@ -85,7 +85,7 @@ if(argv.creds) {
 // Connect to Elasticsearch
 try {
   var esClient = new elasticsearch.Client({
-    host: argv.hosts,
+    hosts: argv.hosts,
     min_sockets: 1
   });
 
