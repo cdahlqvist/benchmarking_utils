@@ -1,5 +1,4 @@
 
-var snapshot_utils = require('./lib/snapshot_utils');
 var elasticsearch = require('elasticsearch');
 
 var optimist = require('optimist')
@@ -75,6 +74,42 @@ catch(e){
   process.exit();
 }
 
-snapshot_utils.log_alias_stats(esClient, argv.index, function() {process.exit();});
+log_stats(esClient, argv.index, function() {process.exit();});
+
+
+function log_stats(esClient, alias, callback) {
+  esClient.indices.stats({
+    index: alias,
+    metric: 'store,docs'
+  }, function (err, resp) {
+    log_aggregated_index_stats(resp, alias);
+    callback();
+  });
+}
+
+function log_aggregated_index_stats(response, alias) {
+  var stats = response['indices'];
+  var docs = 0;
+  var primary_size = 0;
+  var total_size = 0;
+
+  for(var index in stats) {
+    docs += (stats[index].primaries.docs.count - stats[index].primaries.docs.deleted) / 1000000;
+    primary_size += stats[index].primaries.store.size_in_bytes / (1024 * 1024 * 1024);
+    total_size += stats[index].total.store.size_in_bytes / (1024 * 1024 * 1024);
+  }
+
+  log('Alias/index ' + alias + ' => documents: ' + docs.toFixed(3) + 'M primary size: ' + primary_size.toFixed(3) + 'GB total size: ' + total_size.toFixed(3) + 'GB');
+}
+
+function log(msg) {
+  console.log('%s %s', new Date().toISOString(), msg);
+}
+
+
+
+
+
+
 
 
