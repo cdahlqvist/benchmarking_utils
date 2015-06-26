@@ -75,6 +75,6 @@ catch(e){
   process.exit();
 }
 
-snapshot_utils.log_alias_stats(esClient, argv.index, function() {process.exoit();});
+snapshot_utils.log_alias_stats(esClient, argv.index, function() {process.exit();});
 
 
