@@ -15,7 +15,7 @@ var optimist = require('optimist')
     },
     alias: {
       alias: 'a',
-      describe: 'Name of the alias the restored snapshot should be associated with.'
+      describe: 'Name of the alias(es) the restored snapshot should be associated with.'
     },
     hosts: {
       alias: 'h',
@@ -62,6 +62,9 @@ if (!argv.repository) {
 if (!argv.alias) {
   console.log('Error: alias argumant not provided.');
   process.exit();
+} else {
+  argv.alias = argv.alias.split(',');
+  argv.a = argv.alias;
 }
 
 if (!argv.index) {
@@ -103,9 +106,9 @@ catch(e){
   process.exit();
 }
 
-snapshot_utils.log_alias_stats(esClient, argv.alias, function (error) {
-  snapshot_utils.restore_snapshot(esClient, argv.repository, argv.snapshot, argv.index, argv.alias, function() {
-  	snapshot_utils.log_alias_stats(esClient, argv.alias, function () {
+snapshot_utils.log_alias_stats(esClient, argv.alias.slice(0), function (error) {
+  snapshot_utils.restore_snapshot(esClient, argv.repository, argv.snapshot, argv.index, argv.alias.slice(0), function() {
+  	snapshot_utils.log_alias_stats(esClient, argv.alias.slice(0), function () {
   		process.exit();
     })
   })
