@@ -59,13 +59,13 @@ if (!argv.repository) {
   process.exit();
 }
 
-if (!argv.alias) {
-  console.log('Error: alias argumant not provided.');
-  process.exit();
-} else {
+if (argv.alias) {
   argv.alias = argv.alias.split(',');
-  argv.a = argv.alias;
+} else {
+  argv.alias = [];
 }
+
+argv.a = argv.alias;
 
 if (!argv.index) {
   console.log('Error: index argumant not provided.');
