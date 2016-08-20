@@ -1,4 +1,5 @@
 var http = require('http');
+var cluster = require('cluster');
 
 var optimist = require('optimist')
   .usage('Simple utility used to duplicate indices based on snapshots.\n\nUsage: $0 [options]')
@@ -9,7 +10,13 @@ var optimist = require('optimist')
       type: 'integer',
       default: 9200
     },
+    workers: {
+      alias: 'w',
+      describe: 'Number of workers. [Defaults to the number of CPU cores on the host]',
+      type: 'integer'
+    },
     help: {
+      alias: 'h',
       describe: 'Display help message',
       type: 'boolean'
     }
@@ -22,30 +29,61 @@ if (argv.help) {
   process.exit();
 }
 
-// Handle web requests
-server = http.createServer( function(req, res) {
-  if (req.method == 'POST') {
-    var body = '';
-    var index = extract_index_from_url(req.url);
-    var type = extract_type_from_url(req.url);
+var workers;
 
-    req.on('data', function (data) {
-      body += data;
-    });
-    req.on('end', function () {
-      var response = process_bulk(index, type, body);
-      res.writeHead(200, {"Content-Type": "application/json"});
-      res.end(JSON.stringify(response));       
-    });
-  } else {
-      res.writeHead(500, {'Content-Type': 'text/plain'});
-      res.end("Operation not supported.");
-  }
-});
+if (argv.w == undefined) {
+  workers = require('os').cpus().length;
+} else {
+  workers = argv.w;
+}
 
-server.listen(argv.port, function() {
+if(cluster.isMaster) {
+    console.log('Master setting up ' + workers + ' workers...');
+
+    for(var i = 0; i < workers; i++) {
+        cluster.fork();
+    }
+
+    cluster.on('online', function(worker) {
+        console.log('Worker ' + worker.process.pid + ' is online');
+    });
+
+    cluster.on('exit', function(worker, code, signal) {
+        console.log('Worker ' + worker.process.pid + ' died with code: ' + code + ', and signal: ' + signal);
+        console.log('Starting a new worker');
+        cluster.fork();
+    });
+} else {
+  var pid = getRandomInt(1, 30000);
+
+  // Handle web requests
+  server = http.createServer( function(req, res) {
+    if (req.method == 'POST') {
+      var body = '';
+      var index = extract_index_from_url(req.url);
+      var type = extract_type_from_url(req.url);
+
+      req.on('data', function (data) {
+        body += data;
+      });
+      req.on('end', function () {
+        var response = process_bulk(index, type, body);
+        res.writeHead(200, {"Content-Type": "application/json"});
+        res.end(JSON.stringify(response));       
+      });
+    } else if (req.method == 'HEAD') {
+      res.writeHead(200, {'Content-Type': 'text/plain; charset=UTF-8'});
+      res.end();
+    } else {
+      res.writeHead(500, {'Content-Type': 'text/plain; charset=UTF-8'});
+      res.end("Not supported"); 
+    }
+  });
+
+  server.listen(argv.port, function() {
     console.log('Listening on port: ' + argv.port);
-});
+  });
+}
 
 function process_bulk(index_default, type_default, bulk) {
   var op_array = bulk.split(/\r?\n/);
