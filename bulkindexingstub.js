@@ -1,14 +1,28 @@
 var http = require('http');
 var cluster = require('cluster');
+var crypto = require('crypto');
+var id_length = 20;
+var pool = id_length * 128;
+var r = crypto.randomBytes(pool);
+var strs = [];
+var j = 0;
+
+strs.length = id_length;
 
 var optimist = require('optimist')
-  .usage('Simple utility used to duplicate indices based on snapshots.\n\nUsage: $0 [options]')
+  .usage('Simple utility used to efficiently respond successfully to bulk requests.\n\nUsage: $0 [options]')
   .options({
     port: {
       alias: 'p',
       describe: 'Port the process should bind to. [Default: 9200]',
       type: 'integer',
       default: 9200
+    },
+    interval: {
+      alias: 'i',
+      describe: 'Reporting interval for statistics in seconds. [Default: 60]',
+      type: 'integer',
+      default: 60
     },
     workers: {
       alias: 'w',
@@ -54,8 +68,6 @@ if(cluster.isMaster) {
         cluster.fork();
     });
 } else {
-  var pid = getRandomInt(1, 30000);
-
   // Handle web requests
   server = http.createServer( function(req, res) {
     if (req.method == 'POST') {
@@ -88,71 +100,128 @@ if(cluster.isMaster) {
 function process_bulk(index_default, type_default, bulk) {
   var op_array = bulk.split(/\r?\n/);
 
-  var response = {took: getRandomInt(5,30), errors: false, items : []};
- 
-  var op_array_size = op_array.length - 1;
+  var response = {took: getRandomInt(100,500), errors: false, items : []};
 
-  for(var i = 0; i < op_array_size; i += 2) {
-    var r = generate_response(index_default, type_default, JSON.parse(op_array[i]), JSON.parse(op_array[i+1]));
-    response.items.push(r);
+  var op_array_size = op_array.length - 1;
+  var i = 0;
+  var op;
+  var resp;
+
+  do {
+    op = JSON.parse(op_array[i]);
+
+    resp = generate_response(index_default, type_default, JSON.parse(op_array[i]));
+    response.items.push(resp);
+
+    if (op['index'] || op['create'] || op['update']) {
+      i += 2;
+    } else {
+      i++;
+    } 
   }
+  while (i < op_array_size);
 
   return response;
 }
 
-function generate_response(index_default, type_default, index_op, data) {
+function generate_response(index_default, type_default, index_op) {
   var index = index_default;
   var type = type_default;
   var id = "";
   var op;
+  var response;
 
   if (index_op['index']) { 
     op = "index";
-
-    if (index_op['index']['_index']) {
-      index = index_op['index']['_index'];
-    }
-
-    if (index_op['index']['_type']) {
-      type = index_op['index']['_type'];
-    }
-
-    if (index_op['index']['_id']) {
-      id = index_op['index']['_id'];
-    }
+  } else if (index_op['create']) {
+    op = "create"
+  } else if (index_op['update']) {
+    op = "update"
+  } else if (index_op['delete']) {
+    op = "delete"
   }
 
-  if (index_op['create']) { 
-    op = "create";
+  if (index_op[op]['_index']) {
+    index = index_op[op]['_index'];
+  }
 
-    if (index_op['create']['_index']) {
-      index = index_op['create']['_index'];
-    }
+  if (index_op[op]['_type']) {
+    type = index_op[op]['_type'];
+  }
 
-    if (index_op['create']['_type']) {
-      type = index_op['create']['_type'];
-    }
-
-    if (index_op['create']['_id']) {
-      id = index_op['create']['_id'];
-    }
+  if (index_op[op]['_id']) {
+    id = index_op[op]['_id'];
   }
 
   if (id == "") {
     id = generate_id();
   }
 
-  var response = {
-    create : {
-      _version : 1,
-      _index : index,
-      status : 201,
-      _id : id,
-      _type : type,
-      _shards : {
-        total : 2,
-        failed : 0,
-        successful : 2
+  if (op == 'index') {
+    response = {
+      "index" : {
+        "_index" : index,
+        "_type" : type,
+        "_id" : id,
+        "_version" : 1,
+        "result" : "created",
+        "_shards" : {
+          "total" : 2,
+          "successful" : 1,
+          "failed" : 0
+        },
+        "created" : true,
+        "status" : 201
+      }
+    }
+  } else if (op == "create") {
+    response = {
+      "create" : {
+        "_index" : index,
+        "_type" : type,
+        "_id" : id,
+        "_version" : 1,
+        "result" : "created",
+        "_shards" : {
+          "total" : 2,
+          "successful" : 1,
+          "failed" : 0
+        },
+        "created" : true,
+        "status" : 201
+      }
+    }
+  } else if (op == "update") {
+    response = {
+      "update" : {
+        "_index" : index,
+        "_type" : type,
+        "_id" : id,
+        "_version" : 2,
+        "result" : "updated",
+        "_shards" : {
+          "total" : 2,
+          "successful" : 1,
+          "failed" : 0
+        },
+        "status" : 200
+      }
+    }
+  } else {
+    response = {
+      "delete" : {
+        "found" : true,
+        "_index" : index,
+        "_type" : type,
+        "_id" : id,
+        "_version" : 3,
+        "result" : "deleted",
+        "_shards" : {
+          "total" : 2,
+          "successful" : 1,
+          "failed" : 0
+        },
+        "status" : 200
       }
     }
   }
@@ -181,15 +250,19 @@ function extract_type_from_url(url) {
 }
 
 function generate_id() {
-  var rnum = Math.random(0,100000000);
-  var id = "AVam-tYRNa8_" + pad(rnum, 8);
+  var chi;
 
-  return id;
-}
+  for (chi = 0; chi < id_length; chi++) {
+    j++;
+    if (j >= r.length) {
+      r = crypto.randomBytes(pool);
+      j = 0;
+    }
 
-function pad(num, size) {
-    var s = "0000000000000" + num;
-    return s.substr(s.length-size);
+    strs[chi] = (r[j] % 16).toString(16);
+  }
+
+  return strs.join('');
 }
 
 function getRandomInt(min, max) {
