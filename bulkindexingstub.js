@@ -18,12 +18,6 @@ var optimist = require('optimist')
       type: 'integer',
       default: 9200
     },
-    interval: {
-      alias: 'i',
-      describe: 'Reporting interval for statistics in seconds. [Default: 60]',
-      type: 'integer',
-      default: 60
-    },
     workers: {
       alias: 'w',
       describe: 'Number of workers. [Defaults to the number of CPU cores on the host]',
