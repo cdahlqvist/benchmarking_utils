@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/cdahlqvist/benchmarking_utils",
   "dependencies": {
-    "elasticsearch": "^4.0.2",
+    "elasticsearch": "^11.0.1",
     "optimist": "~0.6.1"
   }
 }

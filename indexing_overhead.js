@@ -148,8 +148,8 @@ function calculate_and_print_results(esclient, index, samplesize, avg_size, call
           json_size += JSON.stringify(obj['_source']).length;
           json_count += 1;
 
-          if(obj['_source']['@message']) {
-            raw_size += obj['_source']['@message'].length;
+          if(obj['_source']['message']) {
+            raw_size += obj['_source']['message'].length;
             raw_count += 1;
           }
         }
